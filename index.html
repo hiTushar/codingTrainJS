@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+    crossorigin=""></script>
+    <style>
+        #issMap {
+            height: 480px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Where is ISS?</h1>
+    <p>
+        latitude: <span id="lat"></span>
+        longitude: <span id="lon"></span>
+    </p>
+    <div id="issMap"></div>
+
+
+    <img src="" id="image" />
+        
+    <canvas id="chart"></canvas>
+
+    <script>
+        async function getImage() {
+            const res = await fetch("./sunset.jpg");
+            const blob = await res.blob();
+            document.getElementById("image").src = URL.createObjectURL(blob);
+        }
+
+        getImage(); 
+
+        async function chartIt() {
+            const data = await getData();
+            const chart = document.getElementById("chart");
+            new Chart(chart, {
+                type: 'line',
+                data: {
+                    labels: data.xLabels,
+                    datasets: [{
+                        label: 'Global Average Temperature',
+                        data: data.yTemps,
+                        borderWidth: 1,
+                        fill: false
+                    }]
+                }
+            });
+        }
+
+        async function getData() {
+            const csvData = await fetch("./ZonAnn.Ts+dSST.csv");
+            let data = await csvData.text();
+            const xLabels = [];
+            const yTemps = [];
+            
+            table = data.split("\n").slice(1);
+            table.forEach(row => {
+                let columns = row.split(",");
+                let year = columns[0];
+                xLabels.push(year);
+                let temp = Number(columns[1]);
+                yTemps.push(temp + 14);
+            })
+            return { xLabels, yTemps };
+        }
+        
+        chartIt();
+
+        
+        let map = L.map('issMap').setView([0, 0], 1);
+        let myIcon = L.icon({
+            iconUrl: "iss.png",
+            iconSize: [50, 32],
+            iconAnchor: [25, 16]
+        })
+        let marker = L.marker([0, 0], { icon: myIcon }).addTo(map);
+        const attribution = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+        const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        const tiles = L.tileLayer(tileUrl, { attribution });
+        tiles.addTo(map);
+
+        async function getISS() {
+            const res = await fetch("https://api.wheretheiss.at/v1/satellites/25544");
+            const data = await res.json();
+            const { latitude, longitude } = data;
+
+            marker.setLatLng([latitude, longitude]);
+            map.setView([latitude, longitude], 5);
+
+            document.getElementById("lat").textContent = latitude;
+            document.getElementById("lon").textContent = longitude;
+        }
+
+        getISS();
+        setInterval(getISS, 1000);
+    </script>
+
+</body>
+</html>
